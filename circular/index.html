@@ -1,0 +1,640 @@
+<title>Halftone Wave — Interfering Screens</title>
+<style>
+  :root {
+    --paper:   #F1F4F4;
+    --ground:  #E4E9E9;
+    --ink:     #0D1112;
+    --orange:  #EF5A0C;
+    --muted:   #6B7677;
+    --hair:    #C6CFCF;
+    --accent:  #C4470A;
+    --font-display: "Helvetica Neue", Helvetica, "Arial Nova", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:  #0A0D0E;
+      --ground: #121718;
+      --ink:    #EAF0EF;
+      --orange: #FF6A1F;
+      --muted:  #7E8A8B;
+      --hair:   #263030;
+      --accent: #FF7A33;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:  #0A0D0E;
+    --ground: #121718;
+    --ink:    #EAF0EF;
+    --orange: #FF6A1F;
+    --muted:  #7E8A8B;
+    --hair:   #263030;
+    --accent: #FF7A33;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --paper:  #F1F4F4;
+    --ground: #E4E9E9;
+    --ink:    #0D1112;
+    --orange: #EF5A0C;
+    --muted:  #6B7677;
+    --hair:   #C6CFCF;
+    --accent: #C4470A;
+    color-scheme: light;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .sheet {
+    max-width: 1120px;
+    margin-inline: auto;
+    padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 40px) 56px;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(18px, 3vw, 28px);
+  }
+
+  .masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 24px;
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 12px;
+  }
+  h1 {
+    font-size: clamp(19px, 2.4vw, 25px);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  .slug {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .swatch.k { background: var(--ink); }
+  .swatch.o { background: var(--orange); }
+
+  .plate {
+    position: relative;
+    background: var(--ground);
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1 / 1;
+    max-height: 66vh;
+    margin-inline: auto;
+    width: 100%;
+    max-width: 660px;
+  }
+  .plate::before,
+  .plate::after,
+  .plate > .mark::before,
+  .plate > .mark::after {
+    content: "";
+    position: absolute;
+    width: 15px; height: 15px;
+    border-color: var(--hair);
+    border-style: solid;
+    border-width: 0;
+    pointer-events: none;
+  }
+  .plate::before { top: -1px; left: -1px; border-top-width: 1px; border-left-width: 1px; }
+  .plate::after  { top: -1px; right: -1px; border-top-width: 1px; border-right-width: 1px; }
+  .plate > .mark::before { bottom: -1px; left: -1px; border-bottom-width: 1px; border-left-width: 1px; }
+  .plate > .mark::after  { bottom: -1px; right: -1px; border-bottom-width: 1px; border-right-width: 1px; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* ---- control blocks ---- */
+  .block { display: flex; flex-direction: column; gap: 16px; }
+  .block-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-top: 1px solid var(--hair);
+    padding-top: 14px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .block-head .rule { flex: 1; height: 1px; background: var(--hair); }
+  .block-head .presets { display: flex; gap: 0; border: 1px solid var(--hair); }
+  .block-head .presets button {
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    padding: 5px 11px;
+    background: transparent;
+    color: var(--muted);
+    border: 0;
+    border-right: 1px solid var(--hair);
+    cursor: pointer;
+  }
+  .block-head .presets button:last-child { border-right: 0; }
+  .block-head .presets button:hover { color: var(--accent); }
+  .block-head .presets button:focus-visible { outline: 1px solid var(--accent); outline-offset: -3px; }
+
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 18px clamp(20px, 4vw, 40px);
+  }
+  .ctl { display: flex; flex-direction: column; gap: 7px; }
+  .ctl-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .ctl-head b { font-weight: 500; color: var(--muted); }
+  .ctl-head output {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    background: transparent;
+    height: 16px;
+    cursor: ew-resize;
+  }
+  input[type="range"]::-webkit-slider-runnable-track { height: 1px; background: var(--hair); }
+  input[type="range"]::-moz-range-track { height: 1px; background: var(--hair); }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 3px; height: 15px; margin-top: -7px;
+    border-radius: 0; background: var(--ink); border: none;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 3px; height: 15px;
+    border-radius: 0; background: var(--ink); border: none;
+  }
+  .block.orange input[type="range"]::-webkit-slider-thumb { background: var(--orange); }
+  .block.orange input[type="range"]::-moz-range-thumb { background: var(--orange); }
+  input[type="range"]:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; }
+  .bar .transport { margin-left: auto; }
+
+  .seg { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--hair); }
+  .seg button {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    background: transparent;
+    color: var(--muted);
+    border: 0;
+    border-right: 1px solid var(--hair);
+    cursor: pointer;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .seg.plates button[data-top="orange"][aria-pressed="true"] { background: var(--orange); color: #0A0D0E; }
+  .seg button:focus-visible { outline: 1px solid var(--accent); outline-offset: -3px; }
+
+  .transport {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .transport button {
+    font: inherit; letter-spacing: inherit; text-transform: inherit;
+    padding: 8px 16px;
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--hair);
+    cursor: pointer;
+    min-width: 84px;
+  }
+  .transport button:hover { border-color: var(--accent); color: var(--accent); }
+  .transport button:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+  .transport button[aria-pressed="true"].pill { border-color: var(--accent); color: var(--accent); }
+  .transport .frames { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .note {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--muted);
+    max-width: 64ch;
+    border-top: 1px solid var(--hair);
+    padding-top: 16px;
+  }
+  .note kbd {
+    font: inherit;
+    border: 1px solid var(--hair);
+    padding: 1px 5px;
+    color: var(--ink);
+  }
+</style>
+
+<div class="sheet">
+  <header class="masthead">
+    <h1>Interfering screens &mdash; two plates running on their own clocks</h1>
+    <div class="slug">
+      <span class="swatch k"></span>Key
+      <span class="swatch o"></span>Orange
+    </div>
+  </header>
+
+  <div class="plate">
+    <span class="mark"></span>
+    <canvas id="screen" aria-label="Animated two-colour halftone dot grid with independently animated layers"></canvas>
+  </div>
+
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Wave form">
+      <button type="button" data-mode="interference" aria-pressed="true">Interference</button>
+      <button type="button" data-mode="linear" aria-pressed="false">Linear</button>
+      <button type="button" data-mode="radial" aria-pressed="false">Radial</button>
+      <button type="button" data-mode="spiral" aria-pressed="false">Spiral</button>
+    </div>
+    <div class="seg plates" role="group" aria-label="Plate order">
+      <button type="button" data-top="key" aria-pressed="true">Key on top</button>
+      <button type="button" data-top="orange" aria-pressed="false">Orange on top</button>
+    </div>
+    <div class="transport">
+      <button type="button" class="pill" id="overprint" aria-pressed="false">Overprint</button>
+      <button type="button" id="toggle" aria-pressed="true">Pause</button>
+      <span class="frames" id="readout">0 / 0</span>
+    </div>
+  </div>
+
+  <section class="block">
+    <div class="block-head"><span>Both plates</span><span class="rule"></span></div>
+    <div class="strip">
+      <label class="ctl">
+        <span class="ctl-head"><b>Speed</b><output id="v-speed"></output></span>
+        <input type="range" autocomplete="off" id="speed" min="0" max="2" step="0.01" value="0.6">
+      </label>
+      <label class="ctl">
+        <span class="ctl-head"><b>Wavelength</b><output id="v-scale"></output></span>
+        <input type="range" autocomplete="off" id="scale" min="0.6" max="6" step="0.05" value="2.3">
+      </label>
+      <label class="ctl">
+        <span class="ctl-head"><b>Contrast</b><output id="v-contrast"></output></span>
+        <input type="range" autocomplete="off" id="contrast" min="0.5" max="4" step="0.05" value="1.7">
+      </label>
+      <label class="ctl">
+        <span class="ctl-head"><b>Screen ruling</b><output id="v-density"></output></span>
+        <input type="range" autocomplete="off" id="density" min="12" max="72" step="1" value="34">
+      </label>
+      <label class="ctl">
+        <span class="ctl-head"><b>Max dot</b><output id="v-dot"></output></span>
+        <input type="range" autocomplete="off" id="dot" min="0.4" max="1.15" step="0.01" value="0.96">
+      </label>
+      <label class="ctl">
+        <span class="ctl-head"><b>Screen angle</b><output id="v-angle"></output></span>
+        <input type="range" autocomplete="off" id="angle" min="0" max="360" step="1" value="24">
+      </label>
+      <label class="ctl">
+        <span class="ctl-head"><b>Lift smaller dot</b><output id="v-lift"></output></span>
+        <input type="range" autocomplete="off" id="lift" min="0" max="1" step="0.01" value="0.8">
+      </label>
+    </div>
+  </section>
+
+  <section class="block orange">
+    <div class="block-head">
+      <span class="swatch o"></span>
+      <span>Orange plate, relative to key</span>
+      <span class="rule"></span>
+      <span class="presets" role="group" aria-label="Presets">
+        <button type="button" data-preset="opposed">Opposed</button>
+        <button type="button" data-preset="beat">Beat</button>
+        <button type="button" data-preset="cross">Cross</button>
+        <button type="button" data-preset="drift">Drift</button>
+      </span>
+    </div>
+    <div class="strip">
+      <label class="ctl">
+        <span class="ctl-head"><b>Phase offset</b><output id="v-ophase"></output></span>
+        <input type="range" autocomplete="off" id="ophase" min="0" max="360" step="1" value="180">
+      </label>
+      <label class="ctl">
+        <span class="ctl-head"><b>Speed ratio</b><output id="v-ospeed"></output></span>
+        <input type="range" autocomplete="off" id="ospeed" min="-1.5" max="2" step="0.01" value="0.78">
+      </label>
+      <label class="ctl">
+        <span class="ctl-head"><b>Angle offset</b><output id="v-oangle"></output></span>
+        <input type="range" autocomplete="off" id="oangle" min="-90" max="90" step="1" value="34">
+      </label>
+      <label class="ctl">
+        <span class="ctl-head"><b>Wavelength ratio</b><output id="v-oscale"></output></span>
+        <input type="range" autocomplete="off" id="oscale" min="0.4" max="2.2" step="0.01" value="1.14">
+      </label>
+    </div>
+  </section>
+
+  <p class="note">
+    Each plate carries its own clock, screen angle and wavelength, so the two waves drift through
+    each other instead of staying locked. The plate underneath is pulled in front only where its
+    dot is clearly smaller &mdash; at 80&nbsp;% it reads as a ring, and near-equal dots keep a fixed
+    order rather than swapping every frame. The last stretch before the threshold fades in, so the
+    lift arrives without a pop. Screen angle is the direction the wave travels, clockwise from due
+    right, so 315&deg; runs from bottom left up to top right. Set the orange plate to <b>Opposed</b> and
+    it collapses back to the exact inverse of the key plate. <kbd>Space</kbd> pauses.
+  </p>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const cv = $('screen');
+  const ctx = cv.getContext('2d', { alpha: false });
+  const plate = cv.parentElement;
+  const readout = $('readout');
+  const toggle = $('toggle');
+  const overprintBtn = $('overprint');
+
+  const P = {
+    speed: 0.6, scale: 2.3, contrast: 1.7, density: 34, dot: 0.96, angle: 24, lift: 0.8,
+    ophase: 180, ospeed: 0.78, oangle: 34, oscale: 1.14,
+    mode: 'interference', top: 'key', overprint: false
+  };
+
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  let playing = !reduce.matches;
+  let phaseK = 0, phaseO = 0, last = 0, W = 0, H = 0;
+
+  let ink = '#000', orange = '#f60', ground = '#fff', blend = 'multiply';
+  const luma = hex => {
+    const m = /^#?([\da-f]{6})$/i.exec(hex);
+    if (!m) return 1;
+    const n = parseInt(m[1], 16);
+    return (0.2126 * (n >> 16 & 255) + 0.7152 * (n >> 8 & 255) + 0.0722 * (n & 255)) / 255;
+  };
+  const readColors = () => {
+    const cs = getComputedStyle(document.documentElement);
+    ink = cs.getPropertyValue('--ink').trim();
+    orange = cs.getPropertyValue('--orange').trim();
+    ground = cs.getPropertyValue('--ground').trim();
+    blend = luma(ground) < 0.5 ? 'screen' : 'multiply';
+    if (!playing) draw();
+  };
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  const resize = () => {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const r = plate.getBoundingClientRect();
+    W = Math.max(1, Math.round(r.width));
+    H = Math.max(1, Math.round(r.height));
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!playing) draw();
+  };
+  new ResizeObserver(resize).observe(plate);
+
+  const TAU = Math.PI * 2;
+  const STEPS = 8;                       // alpha buckets for the lift ramp
+  const RAMP = 0.09;                     // ratio width over which the lift fades in
+  const liftPaths = new Array(STEPS);
+
+  // one wave sampler; psi is added outside the internal 0.63 detune so that
+  // psi = pi against an otherwise identical layer is an exact inversion
+  function waveAt(mode, nx, ny, rr, k, ca, sa, ca2, sa2, ph, psi) {
+    if (mode === 'linear') return Math.sin((nx * ca + ny * sa) * k - ph - psi);
+    if (mode === 'radial') return Math.sin(rr * k * 2 - ph - psi);
+    if (mode === 'spiral') return Math.sin(rr * k * 1.6 + Math.atan2(ny, nx) * 3 - ph - psi);
+    const s1 = Math.sin((nx * ca + ny * sa) * k - ph - psi);
+    const s2 = Math.sin((nx * ca2 + ny * sa2) * k * 0.78 - ph * 0.63 - psi);
+    return (s1 + s2) / 2;
+  }
+
+  function draw() {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, 0, W, H);
+
+    const cx = W / 2, cy = H / 2;
+    const R = Math.min(W, H) / 2 * 0.94;
+    const n = P.density;
+    const step = (2 * R) / n;
+    const rMax = step * 0.5 * P.dot;
+    const g = P.contrast;
+
+    const kK = P.scale * Math.PI;
+    const aK = P.angle * Math.PI / 180;
+    const kO = kK * P.oscale;
+    const aO = aK + P.oangle * Math.PI / 180;
+    const psi = P.ophase * Math.PI / 180;
+
+    const cK = Math.cos(aK), sK = Math.sin(aK);
+    const cK2 = Math.cos(aK + 1.19), sK2 = Math.sin(aK + 1.19);
+    const cO = Math.cos(aO), sO = Math.sin(aO);
+    const cO2 = Math.cos(aO + 1.19), sO2 = Math.sin(aO + 1.19);
+
+    const keyTop = P.top === 'key';
+    const thr = P.lift;
+    const lifting = thr > 0;
+
+    const pathK = new Path2D(), pathO = new Path2D();
+    for (let b = 0; b < STEPS; b++) liftPaths[b] = new Path2D();
+    let nk = 0, no = 0;
+
+    for (let j = 0; j < n; j++) {
+      const y = -R + (j + 0.5) * step;
+      const ny = y / R;
+      for (let i = 0; i < n; i++) {
+        const x = -R + (i + 0.5) * step;
+        const nx = x / R;
+        const rr = Math.hypot(nx, ny);
+        if (rr > 1) continue;
+
+        const edge = Math.min(1, Math.max(0, (1 - rr) / 0.14));
+        const fade = edge * edge * (3 - 2 * edge);
+
+        const sk = waveAt(P.mode, nx, ny, rr, kK, cK, sK, cK2, sK2, phaseK, 0);
+        const so = waveAt(P.mode, nx, ny, rr, kO, cO, sO, cO2, sO2, phaseO, psi);
+
+        const rk = Math.pow((sk + 1) / 2, g) * fade * rMax;
+        const ro = Math.pow((so + 1) / 2, g) * fade * rMax;
+
+        if (rk >= 0.12) { pathK.moveTo(x + rk + cx, y + cy); pathK.arc(cx + x, cy + y, rk, 0, TAU); nk++; }
+        if (ro >= 0.12) { pathO.moveTo(x + ro + cx, y + cy); pathO.arc(cx + x, cy + y, ro, 0, TAU); no++; }
+
+        if (!lifting) continue;
+
+        // the buried plate only comes forward once it is decisively smaller --
+        // near-equal radii would otherwise trade places frame to frame and shimmer
+        const rUnder = keyTop ? ro : rk;
+        const rOver = keyTop ? rk : ro;
+        if (rUnder < 0.12 || rUnder >= rOver) continue;
+
+        const ratio = rUnder / rOver;
+        let t = (thr + RAMP - ratio) / RAMP;
+        if (t <= 0) continue;
+        if (t > 1) t = 1;
+        const lift = t * t * (3 - 2 * t);
+        const b = Math.min(STEPS - 1, Math.floor(lift * STEPS));
+        const p = liftPaths[b];
+        p.moveTo(cx + x + rUnder, cy + y);
+        p.arc(cx + x, cy + y, rUnder, 0, TAU);
+      }
+    }
+
+    const underColour = keyTop ? orange : ink;
+    const overColour = keyTop ? ink : orange;
+
+    ctx.fillStyle = underColour;
+    ctx.fill(keyTop ? pathO : pathK);
+    if (P.overprint) ctx.globalCompositeOperation = blend;
+    ctx.fillStyle = overColour;
+    ctx.fill(keyTop ? pathK : pathO);
+
+    if (lifting) {
+      ctx.fillStyle = underColour;
+      for (let b = 0; b < STEPS; b++) {
+        ctx.globalAlpha = (b + 1) / STEPS;
+        ctx.fill(liftPaths[b]);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    readout.textContent = nk.toLocaleString() + ' / ' + no.toLocaleString() + ' dots';
+  }
+
+  function frame(t) {
+    if (!last) last = t;
+    const dt = Math.min(0.05, (t - last) / 1000);
+    last = t;
+    if (playing) {
+      const d = dt * P.speed * 3.2;
+      phaseK += d;
+      phaseO += d * P.ospeed;
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* --- sliders --- */
+  const fmt = {
+    speed: v => v.toFixed(2) + '×',
+    scale: v => v.toFixed(2),
+    contrast: v => v.toFixed(2),
+    density: v => v + ' / dia',
+    dot: v => Math.round(v * 100) + '%',
+    angle: v => v + '°',
+    lift: v => v === 0 ? 'never' : 'below ' + Math.round(v * 100) + '%',
+    ophase: v => v + '°',
+    ospeed: v => v.toFixed(2) + '×',
+    oangle: v => (v > 0 ? '+' : '') + v + '°',
+    oscale: v => v.toFixed(2) + '×'
+  };
+  const syncs = {};
+  for (const key of Object.keys(fmt)) {
+    const input = $(key);
+    const out = $('v-' + key);
+    input.value = input.defaultValue;
+    syncs[key] = () => {
+      P[key] = parseFloat(input.value);
+      out.textContent = fmt[key](P[key]);
+      if (!playing) draw();
+    };
+    input.addEventListener('input', syncs[key]);
+    syncs[key]();
+  }
+
+  // form restoration can land after this script has run, so claim the authored
+  // setup again once the page is actually shown
+  const resetDefaults = () => {
+    for (const key of Object.keys(fmt)) {
+      const input = $(key);
+      if (input.value !== input.defaultValue) { input.value = input.defaultValue; }
+      syncs[key]();
+    }
+  };
+  addEventListener('pageshow', resetDefaults);
+
+  /* --- presets for the orange plate --- */
+  const PRESETS = {
+    opposed: { ophase: 180, ospeed: 1,     oangle: 0,  oscale: 1 },
+    beat:    { ophase: 180, ospeed: 0.88,  oangle: 0,  oscale: 1.07 },
+    cross:   { ophase: 90,  ospeed: 1.24,  oangle: 62, oscale: 0.72 },
+    drift:   { ophase: 210, ospeed: -0.65, oangle: 21, oscale: 1.33 }
+  };
+  document.querySelectorAll('[data-preset]').forEach(b => {
+    b.addEventListener('click', () => {
+      const p = PRESETS[b.dataset.preset];
+      if (p.ospeed === 1) phaseO = phaseK; // relock so "opposed" is exact
+      for (const [k, v] of Object.entries(p)) {
+        $(k).value = v;
+        syncs[k]();
+      }
+    });
+  });
+
+  const setPlaying = on => {
+    playing = on;
+    toggle.textContent = on ? 'Pause' : 'Play';
+    toggle.setAttribute('aria-pressed', String(on));
+    last = 0;
+    if (!on) draw();
+  };
+  toggle.addEventListener('click', () => setPlaying(!playing));
+
+  overprintBtn.addEventListener('click', () => {
+    P.overprint = !P.overprint;
+    overprintBtn.setAttribute('aria-pressed', String(P.overprint));
+    if (!playing) draw();
+  });
+
+  const segment = (sel, key, attr) => {
+    const btns = document.querySelectorAll(sel);
+    btns.forEach(b => b.addEventListener('click', () => {
+      P[key] = b.dataset[attr];
+      btns.forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+      if (!playing) draw();
+    }));
+  };
+  segment('.seg[aria-label="Wave form"] button', 'mode', 'mode');
+  segment('.seg.plates button', 'top', 'top');
+
+  addEventListener('keydown', e => {
+    if (e.code === 'Space' && !/^(INPUT|BUTTON|TEXTAREA)$/.test(e.target.tagName)) {
+      e.preventDefault();
+      setPlaying(!playing);
+    }
+  });
+  reduce.addEventListener('change', e => setPlaying(!e.matches));
+
+  readColors();
+  resize();
+  setPlaying(playing);
+  requestAnimationFrame(frame);
+})();
+</script>
