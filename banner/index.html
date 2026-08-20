@@ -1,7 +1,7 @@
-<title>Halftone Wave — Banner Screen, Light Stock</title>
+<title>Halftone Wave — Banner Screen</title>
 <style>
-  /* this one commits to a single look: black key on white stock, so the
-     palette is stated once and held against the viewer's theme either way */
+  /* the interface commits to one look regardless of the viewer's theme; the
+     artwork's own colours are separate tokens the controls write to */
   :root,
   :root[data-theme="dark"],
   :root[data-theme="light"] {
@@ -269,7 +269,7 @@
 
 <div class="sheet">
   <header class="masthead">
-    <h1>Banner screen &mdash; two inks on white stock</h1>
+    <h1>Banner screen &mdash; two inks on a full-bleed grid</h1>
     <div class="slug">
       <span class="swatch k"></span><span id="slug-key">101211</span>
       <span class="swatch o"></span><span id="slug-two">E2401B</span>
@@ -306,9 +306,10 @@
       <span>Inks</span>
       <span class="rule"></span>
       <span class="presets" role="group" aria-label="Ink presets">
-        <button type="button" data-inks="101211,E2401B">Original</button>
-        <button type="button" data-inks="0D1B2A,00A5A5">Teal</button>
-        <button type="button" data-inks="1A1A1A,FFB703">Amber</button>
+        <button type="button" data-inks="101211,E2401B,FFFFFF">Original</button>
+        <button type="button" data-inks="0D1B2A,00A5A5,F4FAF9">Teal</button>
+        <button type="button" data-inks="1A1A1A,FFB703,FFFFFF">Amber</button>
+        <button type="button" data-inks="ECEFED,FF6A1F,0B0C0C">Night</button>
       </span>
     </div>
     <div class="strip">
@@ -324,6 +325,13 @@
         <div class="inkrow">
           <input type="color" autocomplete="off" id="twoswatch" value="#E2401B" aria-label="Second plate colour picker">
           <input type="text" autocomplete="off" spellcheck="false" id="twohex" value="#E2401B" maxlength="7" aria-label="Second plate hex code">
+        </div>
+      </div>
+      <div class="ctl">
+        <span class="ctl-head"><b>Stock</b></span>
+        <div class="inkrow">
+          <input type="color" autocomplete="off" id="stockswatch" value="#ffffff" aria-label="Stock colour picker">
+          <input type="text" autocomplete="off" spellcheck="false" id="stockhex" value="#FFFFFF" maxlength="7" aria-label="Stock hex code">
         </div>
       </div>
     </div>
@@ -419,8 +427,9 @@
     edge rather than a hard cut. Cells stay on a fixed square lattice sized off the plate width, so
     the ruling reads the same whatever the frame does. Both inks are set by hex &mdash; type a code
     or use the swatch, 3- or 6-digit, hash optional. They colour the plates only, never the
-    interface, so a pale ink cannot make the controls unreadable. The stock stays white whatever
-    the viewer's theme, and the second plate runs on its own clock, angle and wavelength.
+    interface, so a pale ink cannot make the controls unreadable. <b>Stock</b> sets the ground they
+    print on, and overprint follows it &mdash; darkening on pale stock, lightening on dark. The page
+    itself stays light whatever the viewer's theme, and the second plate runs on its own clock, angle and wavelength.
     <b>Export SVG</b> writes the frame currently on screen as real circles, one group per plate,
     at the plate's own pixel size &mdash; the canvas and the export are generated from a single
     pass over the grid, so what you save is what you saw. <b>Copy SVG</b> puts the same markup on
@@ -452,21 +461,29 @@
   let playing = !reduce.matches;
   let phaseK = 0, phaseO = 0, last = 0, W = 0, H = 0;
 
-  // fixed light stock, so overprint is always the subtractive case
   let ink = '#101211', orange = '#E2401B', ground = '#fff';
-  const blend = 'multiply';
+  let blend = 'multiply';
+  const luma = hex => {
+    const m = /^#?([\da-f]{6})$/i.exec(hex);
+    if (!m) return 1;
+    const n = parseInt(m[1], 16);
+    return (0.2126 * (n >> 16 & 255) + 0.7152 * (n >> 8 & 255) + 0.0722 * (n & 255)) / 255;
+  };
   const readColors = () => {
     const cs = getComputedStyle(document.documentElement);
     ink = cs.getPropertyValue('--plate-key').trim();
     orange = cs.getPropertyValue('--plate-two').trim();
     ground = cs.getPropertyValue('--ground').trim();
+    // ink on pale stock darkens; on dark stock the additive analogue is what reads
+    blend = luma(ground) < 0.5 ? 'screen' : 'multiply';
     if (!playing) draw();
   };
 
   /* ---- ink pickers: hex field and swatch drive one another ---- */
   const PLATES = {
-    key: { token: '--plate-key', hex: $('keyhex'), swatch: $('keyswatch'), slug: $('slug-key') },
-    two: { token: '--plate-two', hex: $('twohex'), swatch: $('twoswatch'), slug: $('slug-two') }
+    key:   { token: '--plate-key', hex: $('keyhex'),   swatch: $('keyswatch'),   slug: $('slug-key') },
+    two:   { token: '--plate-two', hex: $('twohex'),   swatch: $('twoswatch'),   slug: $('slug-two') },
+    stock: { token: '--ground',    hex: $('stockhex'), swatch: $('stockswatch'), slug: null }
   };
 
   // accepts 3- or 6-digit hex, with or without the hash
@@ -480,9 +497,10 @@
     const p = PLATES[name];
     document.documentElement.style.setProperty(p.token, hex);
     p.swatch.value = hex.toLowerCase();
-    p.slug.textContent = hex.replace('#', '');
+    if (p.slug) p.slug.textContent = hex.replace('#', '');
     p.hex.setAttribute('aria-invalid', 'false');
     readColors();
+    if (!playing) draw();
   };
 
   const setInk = (name, raw, fromField) => {
@@ -508,11 +526,12 @@
 
   document.querySelectorAll('[data-inks]').forEach(b => {
     b.addEventListener('click', () => {
-      const [k, t] = b.dataset.inks.split(',');
+      const [k, t, g] = b.dataset.inks.split(',');
       PLATES.key.hex.value = '#' + k;
       PLATES.two.hex.value = '#' + t;
       setInk('key', k, false);
       setInk('two', t, false);
+      if (g) { PLATES.stock.hex.value = '#' + g; setInk('stock', g, false); }
     });
   });
 
